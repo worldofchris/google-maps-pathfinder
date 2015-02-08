@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      #map-canvas {
+        width: 1000px;
+        height: 1000px;
+      }
+    </style>
+    <script src="https://maps.googleapis.com/maps/api/js"></script>
+    <script>
+
+      var route = [];
+      var marker;
+      var where = 0;
+      var map;
+      var poly;
+      var num_points = 0;
+
+      function move() {
+        marker.setPosition(new google.maps.LatLng(route[where].x, route[where].y));
+        where += 1;
+
+        if (where < route.length) {
+          setTimeout(move, 50)
+        }
+      }
+
+      // Taken from: http://stackoverflow.com/questions/5347984/letting-users-draw-curved-lines-on-a-google-map
+
+      var GmapsCubicBezier = function(lat1, long1, lat2, long2, lat3, long3, lat4, long4, resolution, map){
+
+          var points = [];
+
+          for(it = 0; it <= 1; it += resolution) {
+              points.push(this.getBezier({x:lat1, y:long1},{x:lat2, y:long2},{x:lat3, y:long3},{x:lat4, y:long4}, it));
+          }
+
+          // Devil's own hack
+          route = route.concat(points.reverse());
+
+          for(var i = 0; i < points.length - 1; i++) {
+                  var Line = new google.maps.Polyline({
+                      path: [new google.maps.LatLng(points[i].x, points[i].y), new google.maps.LatLng(points[i+1].x, points[i+1].y)],
+                      geodesic: true,
+                      strokeOpacity: 0,
+                      strokeColor: 'yellow',
+                      icons: [{
+                              icon: {
+                              path: 'M 0,-2 0,2',
+                              strokeColor: 'black',
+                              strokeOpacity: 1,
+                              strokeWeight: 4
+                          },
+                          repeat: '36px'
+                      },{
+                              icon: {
+                              path: 'M -1,-2 -1,2',
+                              strokeColor: 'black',
+                              strokeOpacity: 1,
+                              strokeWeight: 2
+                          },
+                          repeat: '36px'
+                      }]
+                  }); 
+
+                  Line.setMap(map);   
+          }
+      };
+
+      // from: https://developers.google.com/maps/documentation/javascript/examples/polyline-complex
+
+      /**
+       * Handles click events on a map, and adds a new point to the Polyline.
+       * @param {google.maps.MouseEvent} event
+       */
+      function addLatLng(event) {
+
+        var path = poly.getPath();
+
+        // Because path is an MVCArray, we can simply append a new coordinate
+        // and it will automatically appear.
+        path.push(event.latLng);
+
+        // Add a new marker at the new plotted point on the polyline.
+        // var m = new google.maps.Marker({
+        //   position: event.latLng,
+        //   title: '#' + path.getLength(),
+        //   map: map
+        // });
+
+        logLatLong(event);
+
+        // We're done
+
+        if ( poly.getPath().j.length == 4 + num_points) {
+          var path = poly.getPath().j;
+          var curvedLine = new GmapsCubicBezier(path[0+num_points].k, path[0+num_points].D,
+                                                path[1+num_points].k, path[1+num_points].D,
+                                                path[2+num_points].k, path[2+num_points].D,
+                                                path[3+num_points].k, path[3+num_points].D,
+                                                0.01, map);
+
+          num_points += 3;
+
+          if (!marker) {
+
+            marker = new google.maps.Marker({
+              position: new google.maps.LatLng(route[0].x, route[0].y),
+              map: map,
+              title:"Hello World!"
+            });
+
+          }
+
+         var polyOptions = {
+            strokeColor: '#000000',
+            strokeOpacity: 1.0,
+            strokeWeight: 3
+          };
+          
+        }
+
+
+      }
+
+      GmapsCubicBezier.prototype = {
+
+          B1 : function (t) { return t*t*t; },
+          B2 : function (t) { return 3*t*t*(1-t); },
+          B3 : function (t) { return 3*t*(1-t)*(1-t); },
+          B4 : function (t) { return (1-t)*(1-t)*(1-t); },
+          getBezier : function (C1,C2,C3,C4, percent) {
+              var pos = {};
+              pos.x = C1.x*this.B1(percent) + C2.x*this.B2(percent) + C3.x*this.B3(percent) + C4.x*this.B4(percent);
+              pos.y = C1.y*this.B1(percent) + C2.y*this.B2(percent) + C3.y*this.B3(percent) + C4.y*this.B4(percent);
+              return pos;
+          }
+      };
+
+      function logLatLong(event) {
+
+        console.log(event.latLng);
+
+      }
+
+      function initialize() {
+        var mapCanvas = document.getElementById('map-canvas');
+        var mapOptions = {
+          center: new google.maps.LatLng(51.29189735768707, 0.9322523613281053),
+          zoom: 10,
+          mapTypeId: google.maps.MapTypeId.ROADMAP
+        }
+        map = new google.maps.Map(mapCanvas, mapOptions)
+
+       var polyOptions = {
+          strokeColor: '#000000',
+          strokeOpacity: 1.0,
+          strokeWeight: 1
+        };
+
+        poly = new google.maps.Polyline(polyOptions);
+        poly.setMap(map);
+
+        google.maps.event.addListener(map, 'click', addLatLng);
+
+      }
+
+
+      google.maps.event.addDomListener(window, 'load', initialize);
+    </script>
+  </head>
+  <body>
+    Click on the map to draw a curve then click <a id="move" href="#" onclick="move();">move</a> to move a marker along the curve.
+    <div id="map-canvas"></div>
+  </body>
+</html>
